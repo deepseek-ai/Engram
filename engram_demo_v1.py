@@ -408,7 +408,7 @@ if __name__ == '__main__':
 
     for idx, layer in enumerate(LLM):
         if idx == 0:
-            hidden_states = LLM[0](input_ids)
+            hidden_states = layer(input_ids)
             ## mock hyper-connection
             hidden_states = hidden_states.unsqueeze(2).expand(-1, -1, backbone_config.hc_mult, -1)      
         elif idx == len(LLM)-1:
