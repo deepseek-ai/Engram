@@ -362,17 +362,12 @@ class Engram(nn.Module):
         """
         hash_input_ids = torch.from_numpy(self.hash_mapping.hash(input_ids)[self.layer_id])
         embeddings = self.multi_head_embedding(hash_input_ids).flatten(start_dim=-2)
-        gates = []
-        for hc_idx in range(backbone_config.hc_mult):
-            key = self.key_projs[hc_idx](embeddings)
-            normed_key = self.norm1[hc_idx](key)
-            query = hidden_states[:,:,hc_idx,:]
-            normed_query = self.norm2[hc_idx](query)
-            gate = (normed_key * normed_query).sum(dim=-1) / math.sqrt(backbone_config.hidden_size)
-            gate = gate.abs().clamp_min(1e-6).sqrt() * gate.sign()
-            gate = gate.sigmoid().unsqueeze(-1)
-            gates.append(gate)
-        gates = torch.stack(gates,dim=2)
+        keys = torch.stack([proj(embeddings) for proj in self.key_projs], dim=2)
+        normed_keys = torch.stack([norm(keys[:,:,i,:]) for i, norm in enumerate(self.norm1)], dim=2)
+        normed_queries = torch.stack([norm(hidden_states[:,:,i,:]) for i, norm in enumerate(self.norm2)], dim=2)
+        gate = (normed_keys * normed_queries).sum(dim=-1, keepdim=True) / math.sqrt(backbone_config.hidden_size)
+        gate = gate.abs().clamp_min(1e-6).sqrt() * gate.sign()
+        gates = gate.sigmoid()
         value = gates * self.value_proj(embeddings).unsqueeze(2)
         output = value + self.short_conv(value)
         return output 
