@@ -110,10 +110,12 @@ class CompressedTokenizer:
         return lookup, len(new_tokens)
     
     def _compress(self, input_ids):
-        arr = np.asarray(input_ids, dtype=np.int64)
+        arr = input_ids.cpu().numpy() if isinstance(input_ids, torch.Tensor) else np.asarray(input_ids, dtype=np.int64)
         pos_mask = arr >= 0
         out = arr.copy()
-        valid_ids = arr[pos_mask]
+        valid_ids = arr[pos_mask].astype(np.int64)
+        # Clip to valid range to prevent index out of bounds
+        valid_ids = np.clip(valid_ids, 0, len(self.lookup_table) - 1)
         out[pos_mask] = self.lookup_table[valid_ids]
         return out   
     
@@ -360,7 +362,7 @@ class Engram(nn.Module):
         hidden_states: [B, L, HC_MULT, D]
         input_ids: [B, L]
         """
-        hash_input_ids = torch.from_numpy(self.hash_mapping.hash(input_ids)[self.layer_id])
+        hash_input_ids = torch.from_numpy(self.hash_mapping.hash(input_ids)[self.layer_id]).to(input_ids.device)
         embeddings = self.multi_head_embedding(hash_input_ids).flatten(start_dim=-2)
         gates = []
         for hc_idx in range(backbone_config.hc_mult):
@@ -420,4 +422,3 @@ if __name__ == '__main__':
 
     print("✅ Forward Complete!")
     print(f"{input_ids.shape=}\n{output.shape=}")
-            

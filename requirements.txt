@@ -1,0 +1,7 @@
+torch>=2.0.0
+numpy>=1.24.0
+transformers>=4.30.0
+tokenizers>=0.13.0
+sympy>=1.12
+matplotlib>=3.7.0
+pandas>=2.0.0
