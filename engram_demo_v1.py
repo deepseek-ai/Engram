@@ -23,6 +23,9 @@ pip install torch numpy transformers sympy
 """
 
 ## built-in
+import argparse
+import os
+import sys
 from typing import List
 from dataclasses import dataclass, field
 import math
@@ -34,6 +37,22 @@ import torch
 import torch.nn as nn
 from transformers import AutoTokenizer
 from tokenizers import normalizers, Regex 
+
+# Add parent directory to path for i18n import
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    from engram.i18n import _, set_language, get_current_language
+    I18N_AVAILABLE = True
+except ImportError:
+    # Fallback if i18n module is not available
+    def _(text):
+        return text
+    def set_language(lang):
+        pass
+    def get_current_language():
+        return 'en'
+    I18N_AVAILABLE = False
 
 @dataclass
 class EngramConfig:
@@ -393,14 +412,42 @@ class TransformerBlock(nn.Module):
         hidden_states = self.moe(hidden_states) + hidden_states
         return hidden_states
 
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description=_("Engram Architecture Demo with i18n support")
+    )
+    parser.add_argument(
+        '--language', '-l',
+        type=str,
+        default='en',
+        choices=['en', 'zh_CN'],
+        help=_('Language code (en for English, zh_CN for Chinese)')
+    )
+    parser.add_argument(
+        '--text', '-t',
+        type=str,
+        default=None,
+        help=_('Input text for the demo (default: use example sentence)')
+    )
+    return parser.parse_args()
+
 if __name__ == '__main__':
+    args = parse_args()
+    
+    # Set language if i18n is available
+    if I18N_AVAILABLE:
+        set_language(args.language)
+        print(f"Language set to: {get_current_language()}")
+    
     LLM = [
         nn.Embedding(backbone_config.vocab_size,backbone_config.hidden_size),
         *[TransformerBlock(layer_id=layer_id) for layer_id in range(backbone_config.num_layers)],
         nn.Linear(backbone_config.hidden_size, backbone_config.vocab_size)
     ]
 
-    text = "Only Alexander the Great could tame the horse Bucephalus."
+    # Use provided text or default example
+    text = args.text if args.text else _("Only Alexander the Great could tame the horse Bucephalus.")
     tokenizer = AutoTokenizer.from_pretrained(engram_cfg.tokenizer_name_or_path,trust_remote_code=True)
     input_ids = tokenizer(text,return_tensors='pt').input_ids
 
@@ -418,6 +465,5 @@ if __name__ == '__main__':
         else:
             hidden_states = layer(input_ids=input_ids,hidden_states=hidden_states)
 
-    print("✅ Forward Complete!")
+    print(_("✅ Forward Complete!"))
     print(f"{input_ids.shape=}\n{output.shape=}")
-            
