@@ -1,0 +1,48 @@
+# English translations for Engram.
+# Copyright (C) 2024 DeepSeek AI
+# This file is distributed under the same license as the Engram package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Engram 0.1.0\n"
+"Report-Msgid-Bugs-To: service@deepseek.com\n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: 2024-01-01 00:00+0000\n"
+"Last-Translator: DeepSeek AI\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: engram_demo_v1.py
+msgid "Forward Complete!"
+msgstr "Forward Complete!"
+
+#: engram_demo_v1.py
+msgid "input_ids.shape"
+msgstr "input_ids.shape"
+
+#: engram_demo_v1.py
+msgid "output.shape"
+msgstr "output.shape"
+
+#: engram_demo_v1.py
+msgid "Error: Failed to initialize tokenizer"
+msgstr "Error: Failed to initialize tokenizer"
+
+#: engram_demo_v1.py
+msgid "Error: Invalid input shape"
+msgstr "Error: Invalid input shape"
+
+#: engram_demo_v1.py
+msgid "Engram Demo - Processing text"
+msgstr "Engram Demo - Processing text"
+
+#: engram_demo_v1.py
+msgid "Initializing Engram module"
+msgstr "Initializing Engram module"
+
+#: engram_demo_v1.py
+msgid "Processing complete"
+msgstr "Processing complete"

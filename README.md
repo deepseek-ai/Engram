@@ -75,11 +75,12 @@ The Engram module augments the backbone by retrieving static $N$-gram memory and
   <img width="80%" src="figures/case.png" alt="Long Context Results">
 </p>
 
+
 ## 5. Quick Start
 
 We recommend using Python 3.8+ and PyTorch.
 ```bash
-pip install torch numpy transformers sympy
+pip install torch numpy transformers sympy polib
 ```
 We provide a standalone implementation to demonstrate the core logic of the Engram module:
 ```bash
@@ -88,10 +89,51 @@ python engram_demo_v1.py
 
 > ⚠️ **Note:** The provided code is a demonstration version intended to illustrate the data flow. It mocks standard components (like Attention/MoE/mHC) to focus on the Engram module. 
 
+## 6. Internationalization (i18n) Support 🇬🇧🇨🇳
 
-## 6. License
+Engram now supports multiple languages! You can easily switch between English and Chinese (Simplified):
+
+### Usage Example
+
+```python
+from engram import set_language, _
+
+# Set language to Chinese
+set_language('zh_CN')
+
+# Now all user-facing strings will be in Chinese
+print(_('Forward Complete!'))  # Output: 前向传播完成！
+```
+
+### Supported Languages
+
+| Language | Code | Status |
+|----------|------|--------|
+| English | `en` | ✅ Default |
+| 中文 (Chinese Simplified) | `zh_CN` | ✅ Supported |
+
+### Running the Demo
+
+```bash
+# Run the i18n demo
+python examples/i18n_demo.py
+
+# Run tests
+python tests/test_i18n.py
+```
+
+### Adding New Translations
+
+To add support for a new language:
+
+1. Create a new directory under `engram/locales/` (e.g., `engram/locales/fr/LC_MESSAGES/`)
+2. Copy `engram.po` from an existing locale and translate the strings
+3. Compile to `.mo` format using: `msgfmt engram.po -o engram.mo`
+4. Submit a PR!
+
+## 7. License
 The use of Engram models is subject to [the Model License](LICENSE).
 
-## 7. Contact
+## 8. Contact
 
 If you have any questions, please raise an issue or contact us at [service@deepseek.com](mailto:service@deepseek.com).

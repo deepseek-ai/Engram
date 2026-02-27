@@ -1,0 +1,48 @@
+# Chinese (Simplified) translations for Engram.
+# Copyright (C) 2024 DeepSeek AI
+# This file is distributed under the same license as the Engram package.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Engram 0.1.0\n"
+"Report-Msgid-Bugs-To: service@deepseek.com\n"
+"POT-Creation-Date: 2024-01-01 00:00+0000\n"
+"PO-Revision-Date: 2024-01-01 00:00+0000\n"
+"Last-Translator: DeepSeek AI\n"
+"Language-Team: Chinese (Simplified)\n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: engram_demo_v1.py
+msgid "Forward Complete!"
+msgstr "前向传播完成！"
+
+#: engram_demo_v1.py
+msgid "input_ids.shape"
+msgstr "输入ID形状"
+
+#: engram_demo_v1.py
+msgid "output.shape"
+msgstr "输出形状"
+
+#: engram_demo_v1.py
+msgid "Error: Failed to initialize tokenizer"
+msgstr "错误：分词器初始化失败"
+
+#: engram_demo_v1.py
+msgid "Error: Invalid input shape"
+msgstr "错误：无效的输入形状"
+
+#: engram_demo_v1.py
+msgid "Engram Demo - Processing text"
+msgstr "Engram 演示 - 处理文本中"
+
+#: engram_demo_v1.py
+msgid "Initializing Engram module"
+msgstr "正在初始化 Engram 模块"
+
+#: engram_demo_v1.py
+msgid "Processing complete"
+msgstr "处理完成"
