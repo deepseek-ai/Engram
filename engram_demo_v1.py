@@ -324,7 +324,7 @@ class MultiHeadEmbedding(nn.Module):
         return output
     
 class Engram(nn.Module):
-    def __init__(self, layer_id):
+    def __init__(self, layer_id, embedding_factory=None):
         super().__init__()
         self.layer_id = layer_id
         self.hash_mapping = NgramHashMapping(
@@ -337,10 +337,17 @@ class Engram(nn.Module):
             pad_id = engram_cfg.pad_id,
             seed = engram_cfg.seed,
         )
-        self.multi_head_embedding = MultiHeadEmbedding(
+        # A factory can construct an alternate gather backend without first
+        # allocating the default table. Hash addressing and downstream fusion
+        # remain unchanged. The default retains the original trainable module.
+        if embedding_factory is None:
+            embedding_factory = MultiHeadEmbedding
+        self.multi_head_embedding = embedding_factory(
             list_of_N = [x for y in self.hash_mapping.vocab_size_across_layers[self.layer_id] for x in y],
             D = engram_cfg.n_embed_per_ngram // engram_cfg.n_head_per_ngram,
         )
+        if not isinstance(self.multi_head_embedding, nn.Module):
+            raise TypeError("embedding_factory must return an nn.Module")
         self.short_conv = ShortConv(
             hidden_size = backbone_config.hidden_size,
             kernel_size = engram_cfg.kernel_size,

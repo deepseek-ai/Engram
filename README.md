@@ -88,6 +88,35 @@ python engram_demo_v1.py
 
 > ⚠️ **Note:** The provided code is a demonstration version intended to illustrate the data flow. It mocks standard components (like Attention/MoE/mHC) to focus on the Engram module. 
 
+### Optional embedding backend
+
+`Engram(layer_id, embedding_factory=...)` accepts a callable receiving
+`list_of_N` (the original per-head vocabulary sizes) and `D` (the per-head
+embedding dimension). It must return an `nn.Module` whose `forward` accepts
+head-local integer IDs of shape `[..., heads]` and returns
+`[..., heads, D]` on the device/dtype expected by the projections. Hash IDs,
+head order and downstream gates/convolution are unchanged.
+
+The default factory is `MultiHeadEmbedding`, preserving the original trainable
+behavior. An alternate factory can open a frozen mmap/host-storage table without
+first allocating the default embedding matrix. Such backends own their checkpoint
+loading, precision, device transfers, training support and resource cleanup;
+this hook does not itself provide offloading or compression.
+
+```python
+def embedding_factory(list_of_N, D):
+    # Return your nn.Module after checking its head sizes and dimension.
+    return MyEmbeddingBackend(list_of_N=list_of_N, D=D)
+
+engram = Engram(layer_id=1, embedding_factory=embedding_factory)
+```
+
+Offline factory/default and full gated-output tests (no tokenizer download):
+
+```bash
+python -m unittest discover -s tests
+```
+
 
 ## 6. License
 The use of Engram models is subject to [the Model License](LICENSE).
