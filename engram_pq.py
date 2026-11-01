@@ -242,6 +242,11 @@ class CompressedTokenizerPq:
         lookup = [old2new[tid] for tid in range(vocab_size)]
         return lookup, len(new_tokens)
 
+    def encode(self, text: str) -> List[int]:
+        if hasattr(self.tokenizer, "encode"):
+            return [int(x) for x in self.tokenizer.encode(text)]
+        return SovereignOfflineTokenizer().encode(text)
+
     def _compress_row(self, row: Sequence[int]) -> List[int]:
         limit = len(self.lookup_table)
         return [
