@@ -68,24 +68,30 @@ impl PrimeBucketMod {
         }
     }
 
-    /// Compute `x % self.prime` for `x < 2^32` using Lemire's `p/q` (`q = 2^64`) reciprocal
-    /// without hardware division instructions.
+    /// Compute `x % self.prime` for `x < 2^32` using Lemire's direct `p/q` (`q = 2^64`)
+    /// reciprocal remainder (`mulhi64(wrapping_mul(x, inv_q64), prime)`) with zero branches
+    /// and zero hardware division instructions.
+    #[inline]
+    pub const fn fast_rem_u32(&self, x: u64) -> usize {
+        let lowbits = x.wrapping_mul(self.inv_q64);
+        (((lowbits as u128) * (self.prime as u128)) >> 64) as usize
+    }
+
+    /// Compute `x % self.prime` for any 64-bit `x` (`0 <= x < 2^64` when `self.prime < 2^32`)
+    /// using Lemire's `p/q` (`q = 2^64`) reciprocal without hardware division instructions.
     #[inline]
     pub const fn fast_rem_u64(&self, x: u64) -> usize {
-        let q_est = (((x as u128) * (self.inv_q64 as u128)) >> 64) as u64;
-        let prod = q_est.wrapping_mul(self.prime);
-        let mut rem = if x >= prod {
-            x - prod
-        } else {
-            x.wrapping_add(self.prime) - prod
-        };
-        if rem >= self.prime {
-            rem -= self.prime;
-            if rem >= self.prime {
-                rem %= self.prime;
-            }
+        if x <= 0xFFFF_FFFF {
+            return self.fast_rem_u32(x);
         }
-        rem as usize
+        let inv_floor = self.inv_q64.wrapping_sub(1);
+        let q_est = (((x as u128) * (inv_floor as u128)) >> 64) as u64;
+        let rem = x.wrapping_sub(q_est.wrapping_mul(self.prime));
+        if rem >= self.prime {
+            (rem - self.prime) as usize
+        } else {
+            rem as usize
+        }
     }
 }
 
@@ -165,7 +171,90 @@ pub fn engram_hash_ngram_pq_into(
             let base_h = ngram_idx * n_heads_per_ngram;
             for h in 0..n_heads_per_ngram {
                 let b = &buckets[base_h + h];
-                row_out[base_h + h] = b.table_offset + b.fast_rem_u64(mix32);
+                row_out[base_h + h] = b.table_offset + b.fast_rem_u32(mix32);
+            }
+        }
+    }
+}
+
+/// Unfolded 64-bit N-gram XOR-multiply hash + hardware `% prime` modulo
+/// (matching SGLang's `_engram_hash_kernel` and `engram_demo_v1.py` where the full
+/// 64-bit rolling XOR-product is reduced modulo each head's prime).
+pub fn engram_hash_ngram_mod64_into(
+    tokens: &[u64],
+    pad_id: u64,
+    multipliers: &[u64],
+    n_heads_per_ngram: usize,
+    buckets: &[PrimeBucketMod],
+    out_global_indices: &mut [usize],
+) {
+    let seq_len = tokens.len();
+    let max_ngram = multipliers.len();
+    if max_ngram < 2 || n_heads_per_ngram == 0 {
+        return;
+    }
+    let total_heads = (max_ngram - 1) * n_heads_per_ngram;
+    assert!(buckets.len() >= total_heads);
+    assert!(out_global_indices.len() >= seq_len * total_heads);
+
+    for t in 0..seq_len {
+        let row_out = &mut out_global_indices[t * total_heads..(t + 1) * total_heads];
+        let mut mix = tokens[t].wrapping_mul(multipliers[0]);
+
+        for n in 2..=max_ngram {
+            let k = n - 1;
+            let tok_k = if t >= k { tokens[t - k] } else { pad_id };
+            mix ^= tok_k.wrapping_mul(multipliers[k]);
+
+            let ngram_idx = n - 2;
+            let base_h = ngram_idx * n_heads_per_ngram;
+            for h in 0..n_heads_per_ngram {
+                let b = &buckets[base_h + h];
+                row_out[base_h + h] = b.table_offset + ((mix % b.prime) as usize);
+            }
+        }
+    }
+}
+
+/// Unfolded 64-bit `p/q` (`q = 2^64`) reciprocal N-gram hash mapping (zero hardware division).
+///
+/// Produces 100% bit-identical bucket indices to [`engram_hash_ngram_mod64_into`] across all
+/// 64-bit rolling hashes `mix` using the floor reciprocal `inv_floor = inv_q64 - 1`.
+pub fn engram_hash_ngram_pq64_into(
+    tokens: &[u64],
+    pad_id: u64,
+    multipliers: &[u64],
+    n_heads_per_ngram: usize,
+    buckets: &[PrimeBucketMod],
+    out_global_indices: &mut [usize],
+) {
+    let seq_len = tokens.len();
+    let max_ngram = multipliers.len();
+    if max_ngram < 2 || n_heads_per_ngram == 0 {
+        return;
+    }
+    let total_heads = (max_ngram - 1) * n_heads_per_ngram;
+    assert!(buckets.len() >= total_heads);
+    assert!(out_global_indices.len() >= seq_len * total_heads);
+
+    for t in 0..seq_len {
+        let row_out = &mut out_global_indices[t * total_heads..(t + 1) * total_heads];
+        let mut mix = tokens[t].wrapping_mul(multipliers[0]);
+
+        for n in 2..=max_ngram {
+            let k = n - 1;
+            let tok_k = if t >= k { tokens[t - k] } else { pad_id };
+            mix ^= tok_k.wrapping_mul(multipliers[k]);
+
+            let ngram_idx = n - 2;
+            let base_h = ngram_idx * n_heads_per_ngram;
+            for h in 0..n_heads_per_ngram {
+                let b = &buckets[base_h + h];
+                let inv_floor = b.inv_q64.wrapping_sub(1);
+                let q_est = (((mix as u128) * (inv_floor as u128)) >> 64) as u64;
+                let rem = mix.wrapping_sub(q_est.wrapping_mul(b.prime));
+                let r = if rem >= b.prime { rem - b.prime } else { rem };
+                row_out[base_h + h] = b.table_offset + (r as usize);
             }
         }
     }

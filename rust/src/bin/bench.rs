@@ -1,9 +1,9 @@
 use engram_pq::{
     Bfp64HeadRow, ENGRAM_DEFAULT_HC_MULT, ENGRAM_HEAD_DIM, Mem8AdaptiveHeadRow, PQ_Q16,
     PrimeBucketMod, engram_bfp64_int_aligned_matmul_into, engram_bfp64_int_q16_matmul_into,
-    engram_gather_bfp64_heads_into, engram_hash_ngram_mod_into, engram_hash_ngram_pq_into,
-    engram_mem8_adaptive_matmul_into, engram_step_bfp64_into, engram_step_dense_fp64_into,
-    engram_step_pq_no_floats_into,
+    engram_gather_bfp64_heads_into, engram_hash_ngram_mod_into, engram_hash_ngram_mod64_into,
+    engram_hash_ngram_pq_into, engram_hash_ngram_pq64_into, engram_mem8_adaptive_matmul_into,
+    engram_step_bfp64_into, engram_step_dense_fp64_into, engram_step_pq_no_floats_into,
 };
 use std::hint::black_box;
 use std::time::Instant;
@@ -35,10 +35,16 @@ fn main() {
 
     let mut idx_mod = vec![0usize; seq_len * total_heads];
     let mut idx_pq = vec![0usize; seq_len * total_heads];
+    let mut idx_mod64 = vec![0usize; seq_len * total_heads];
+    let mut idx_pq64 = vec![0usize; seq_len * total_heads];
 
     engram_hash_ngram_mod_into(&tokens, 2, &multipliers, n_heads_per_ngram, &buckets, &mut idx_mod);
     engram_hash_ngram_pq_into(&tokens, 2, &multipliers, n_heads_per_ngram, &buckets, &mut idx_pq);
-    assert_eq!(idx_mod, idx_pq, "Lemire p/q prime hashing must be bit-exact with % prime");
+    assert_eq!(idx_mod, idx_pq, "Lemire p/q 32-bit prime hashing must be bit-exact with % prime");
+
+    engram_hash_ngram_mod64_into(&tokens, 2, &multipliers, n_heads_per_ngram, &buckets, &mut idx_mod64);
+    engram_hash_ngram_pq64_into(&tokens, 2, &multipliers, n_heads_per_ngram, &buckets, &mut idx_pq64);
+    assert_eq!(idx_mod64, idx_pq64, "Lemire p/q 64-bit prime hashing must be bit-exact with % prime");
 
     let hash_iters = 500;
     let t_h0 = Instant::now();
@@ -46,9 +52,9 @@ fn main() {
         engram_hash_ngram_mod_into(
             black_box(&tokens),
             2,
-            &multipliers,
+            black_box(&multipliers),
             n_heads_per_ngram,
-            &buckets,
+            black_box(&buckets),
             &mut idx_mod,
         );
     }
@@ -59,13 +65,39 @@ fn main() {
         engram_hash_ngram_pq_into(
             black_box(&tokens),
             2,
-            &multipliers,
+            black_box(&multipliers),
             n_heads_per_ngram,
-            &buckets,
+            black_box(&buckets),
             &mut idx_pq,
         );
     }
     let hash_pq_us = t_h1.elapsed().as_secs_f64() * 1e6 / (hash_iters as f64);
+
+    let t_h2 = Instant::now();
+    for _ in 0..hash_iters {
+        engram_hash_ngram_mod64_into(
+            black_box(&tokens),
+            2,
+            black_box(&multipliers),
+            n_heads_per_ngram,
+            black_box(&buckets),
+            &mut idx_mod64,
+        );
+    }
+    let hash_mod64_us = t_h2.elapsed().as_secs_f64() * 1e6 / (hash_iters as f64);
+
+    let t_h3 = Instant::now();
+    for _ in 0..hash_iters {
+        engram_hash_ngram_pq64_into(
+            black_box(&tokens),
+            2,
+            black_box(&multipliers),
+            n_heads_per_ngram,
+            black_box(&buckets),
+            &mut idx_pq64,
+        );
+    }
+    let hash_pq64_us = t_h3.elapsed().as_secs_f64() * 1e6 / (hash_iters as f64);
 
     // Build MultiHeadEmbedding table (`total_table_rows x 64`)
     let mut dense_table = vec![0.0f64; total_table_rows * ENGRAM_HEAD_DIM];
@@ -351,11 +383,17 @@ fn main() {
     println!("  8b-is / Engram — Sovereign p/q + Omni BFP-64 + MEM|8 + Quantum 64-Trit Benchmark");
     println!("=========================================================================================");
     println!("  1. Multi-Head N-Gram Prime Hashing (1024 tokens x 16 prime heads = 16,384 hashes):");
-    println!("     - Hardware `% prime` modulo:               {:>8.2} us (1.00x)", hash_mod_us);
+    println!("     - 32-bit Folded Hardware `% prime`:        {:>8.2} us (1.00x)", hash_mod_us);
     println!(
-        "     - Lemire p/q (q=2^64) Reciprocal:          {:>8.2} us ({:.2}x speedup, bit-exact!)",
+        "     - 32-bit Folded Lemire p/q (q=2^64):       {:>8.2} us ({:.2}x speedup, bit-exact!)",
         hash_pq_us,
         hash_mod_us / hash_pq_us
+    );
+    println!("     - 64-bit Unfolded Hardware `% prime`:      {:>8.2} us (1.00x)", hash_mod64_us);
+    println!(
+        "     - 64-bit Unfolded Lemire p/q (q=2^64):     {:>8.2} us ({:.2}x speedup, bit-exact!)",
+        hash_pq64_us,
+        hash_mod64_us / hash_pq64_us
     );
     println!("  2. Native 64-Dim Head Table Compression (`D_head = 64 == BFP-64 block size`):");
     println!(
