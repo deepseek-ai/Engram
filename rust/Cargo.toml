@@ -1,0 +1,16 @@
+[package]
+name = "engram-pq"
+version = "0.3.0"
+edition = "2024"
+description = "DeepSeek Engram Conditional Memory on the 8b-is Sovereign p/q + Omni BFP-64 + MEM|8 + Quantum 64-Trit Substrate (no_std, #![forbid(unsafe_code)], zero deps)"
+license = "Apache-2.0"
+repository = "https://github.com/8b-is/Engram"
+
+[features]
+default = ["std"]
+std = []
+
+[[bin]]
+name = "bench"
+path = "src/bin/bench.rs"
+required-features = ["std"]
